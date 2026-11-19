@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>抑うつ得点 信頼区間の計算練習</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 演習プリントのように落ち着いて正確。ヒントはやさしく
+   IDEA: 石畳の広場に立つ100人に聞き取りをして、手計算で区間を出す
+   PICTURE: 10×10の広場（手前に「あなた」）と、聞いた値の数直線
+   COLOUR and TYPE: 石畳サンド #efe4cc、インク黒、指針オレンジ #ff4f00、区間ブルー #2f6bff。Geist + Noto Sans JP
+   LAYOUT: 上に広場と聞き取り状況、下に計算ステップ（左）と計算表・分布表（右） */
+:root{color-scheme:light dark;--bg:light-dark(#e9eaec,#141517);--panel:light-dark(#f7f7f8,#1d1f22);--ink:light-dark(#121316,#e9eaec);--mute:light-dark(#5d6168,#9a9fa7);--line:light-dark(#cfd2d6,#33363b);--ground:light-dark(#efe4cc,#2a2620);--tile:light-dark(#e2d4b5,#352f27);--acc:#ff4f00;--accs:light-dark(#ffe3d6,#3a2014);--ci:#2f6bff;--cis:light-dark(#dfe7ff,#1d2a4a);--ok:light-dark(#1b7f4b,#5fd39a);--oks:light-dark(#dcf3e6,#173526)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Geist,"Noto Sans JP",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(18px,3vw,40px) max(4vw,14px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:clamp(26px,4vw,40px);line-height:1.1;margin:0 0 6px;font-weight:700;text-wrap:balance}
+h2{font-size:19px;margin:0 0 6px;font-weight:700}
+p.lead{margin:0;color:var(--mute);max-width:76ch}
+.set{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:flex-end;margin-top:16px}
+.lbl{font-size:13px;color:var(--mute);margin-bottom:4px}
+button{font:500 15px Geist,"Noto Sans JP",sans-serif;min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--mute)}button:disabled{opacity:.45;cursor:not-allowed}
+button.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.acc{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.on{background:var(--accs);border-color:var(--acc)}
+button.sm{min-height:36px;padding:0 10px;font-size:14px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.game{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:900px){.game{grid-template-columns:minmax(0,1fr)}}
+.plaza{background:var(--ground);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.plaza svg{display:block;width:100%;height:auto}
+.plaza g.p{cursor:pointer}.plaza g.p:hover .body{filter:brightness(1.12)}
+.pcap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:13px;color:var(--mute);margin:0 0 6px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.info{padding:8px 12px;border-radius:8px;font-size:14px;margin:8px 0}
+.vals{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px;font-variant-numeric:tabular-nums}
+.vals span{background:var(--ink);color:var(--bg);border-radius:99px;padding:1px 10px;font-size:14px;font-weight:700}
+.dot{position:relative;height:120px;background:var(--bg);border-radius:10px}
+.dot svg{position:absolute;inset:0;width:100%;height:100%}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.mycl{font-size:clamp(26px,4vw,36px);font-weight:700;color:var(--ci);font-variant-numeric:tabular-nums;line-height:1.15}
+.mycl.wait{font-size:16px;color:var(--mute);font-weight:500}
+.result{margin-top:14px;padding:14px;border-radius:10px;background:var(--bg);display:none}
+.result.show{display:block}
+.result .v{font-size:20px;font-weight:700}
+.result p{margin:6px 0 0;font-size:15px}
+.calc{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:900px){.calc{grid-template-columns:minmax(0,1fr)}}
+.step{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;background:var(--panel)}
+.step.ok{border-color:var(--ok);background:var(--oks)}
+.step.ng{border-color:var(--acc)}
+.shd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.shd b{font-size:16px}.shd .fm{font-size:14px;color:var(--mute)}
+.srow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.srow input{font:500 16px Geist,sans-serif;width:150px;height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.fb{font-size:14px;margin-top:6px}
+.fb.ok{color:var(--ok);font-weight:700}.fb.ng{color:var(--acc)}
+.hint{font-size:14px;background:var(--cis);border-radius:8px;padding:8px 10px;margin-top:8px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.prog{font-size:14px;color:var(--mute);margin-bottom:4px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:500;color:var(--mute);font-size:13px}
+tr.hl td{background:var(--accs);font-weight:700}td.hl{background:var(--accs);font-weight:700}
+tfoot td{font-weight:700;border-top:2px solid var(--mute)}
+.tblbox{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+.empty{color:var(--mute);font-size:14px;padding:10px}
+details{margin-top:12px}summary{cursor:pointer;min-height:36px;font-weight:500}
+.note{font-size:13px;color:var(--mute)}
+</style>
+</head>
+<body>
+<section class="band"><div class="wrap">
+  <h1>広場の100人　抑うつ得点の信頼区間を計算しよう</h1>
+  <p class="lead">広場の100人は、それぞれ抑うつ尺度の得点を持っています。人をクリックして話しかけると得点を教えてくれます。何人かに聞いたら、下の計算ステップに沿って、100人全体の平均についての信頼区間を自分で計算してみましょう。母集団の平均と標準偏差は、答え合わせのときに表示されます。</p>
+  <div class="set">
+    <div><div class="lbl">母集団の標準偏差 σ</div><div class="seg" id="modeChips"><button type="button" data-v="u">分かっていない（t）</button><button type="button" data-v="k">分かっている（z）</button></div></div>
+    <div><div class="lbl">信頼水準</div><div class="seg" id="lvChips"></div></div>
+    <button class="pri" id="newBtn" type="button">新しい広場にする</button>
+  </div>
+</div></section>
+
+<section class="band" style="padding-top:0"><div class="wrap game">
+  <div>
+    <div class="pcap"><span id="pinfo"></span><span>クリックで話しかける</span></div>
+    <div class="plaza"><svg id="plaza" viewBox="0 0 1000 1030" role="img" aria-label="100人のいる広場"></svg></div>
+  </div>
+  <div class="card">
+    <div class="note" id="rlabel"></div>
+    <div id="sigInfo"></div>
+    <div class="note">聞いた得点</div>
+    <div class="vals" id="vals"></div>
+    <div class="dot"><svg id="dotSvg" role="img" aria-label="聞いた得点の数直線"></svg></div>
+    <div class="btns"><button id="r1" type="button">ランダムに1人</button><button id="r5" type="button">ランダムに5人</button></div>
+    <div style="margin-top:14px" class="note">あなたが計算した信頼区間</div>
+    <div class="mycl wait" id="mycl">下の計算ステップで下限と上限まで正解すると、ここに表示されます</div>
+    <div class="btns"><button id="go" class="acc" type="button">答え合わせ（母平均・母標準偏差を見る）</button></div>
+    <div class="result" id="result"></div>
+  </div>
+</div></section>
+
+<section class="band" style="padding-top:0"><div class="wrap calc">
+  <div class="card">
+    <h2>計算ステップ</h2>
+    <div class="prog" id="prog"></div>
+    <p class="note" style="margin:0">小数は第3位を四捨五入して、第2位まで入力してください（多少の丸めの違いは正解にします）。迷ったら「ヒント」を押すと、数値を代入した式が出ます。</p>
+    <div id="steps"></div>
+  </div>
+  <div class="card">
+    <h2>計算のアシスト</h2>
+    <details id="dTbl" open><summary>計算表（x、偏差、偏差の2乗）</summary>
+      <div class="srow"><button class="sm" id="fillDev" type="button">偏差と2乗を表に入れる</button><span class="note">平均 x̄ のステップが正解すると使えます</span></div>
+      <div class="tblbox" id="calcTbl"></div>
+    </details>
+    <details id="dDist"><summary id="distSum">t分布表（両側）</summary>
+      <div class="tblbox" id="distTbl"></div>
+    </details>
+    <details><summary>√ の値（標本サイズ n 用）</summary>
+      <div class="tblbox" id="sqrtTbl"></div>
+    </details>
+  </div>
+</div></section>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const N=100,MU=35,SIG=8,ZC={0.9:1.6449,0.95:1.9600,0.99:2.5758};
+const SKIN=['#f3cfae','#e2b086','#c98e5f','#94603e','#f7dcc4','#b97a4d'];
+const HAIR=['#2b2118','#5a3a22','#8b5a2b','#1d1d1d','#b0743c','#d8b46c','#7a7a7a','#3b2a4a'];
+const SHIRT=['#e4572e','#2f6bff','#29a36a','#f2b134','#8a4fff','#e04f8a','#17a2b8','#6c7a89','#c0392b','#3d5a80','#98c1d9','#ee6c4d'];
+let pop=[],look=[],asked=[],last=null,revealed=false,lv=0.95,mode='u',popM=MU,popSD=SIG,fill=false;
+let ans={},state={},hintOn={};
+
+/* ---- math ---- */
+function randn(){let u=0;while(u===0)u=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*Math.random())}
+function lgamma(x){const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];if(x<0.5)return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);x-=1;let a=c[0];const t=x+7.5;for(let i=1;i<9;i++)a+=c[i]/(x+i);return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a)}
+function betacf(a,b,x){const F=1e-300;let qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<F)d=F;d=1/d;let h=d;
+  for(let m=1;m<=300;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<F)d=F;c=1+aa/c;if(Math.abs(c)<F)c=F;d=1/d;h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<F)d=F;c=1+aa/c;if(Math.abs(c)<F)c=F;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<3e-14)break}return h}
+function ibeta(x,a,b){if(x<=0)return 0;if(x>=1)return 1;const bt=Math.exp(lgamma(a+b)-lgamma(a)-lgamma(b)+a*Math.log(x)+b*Math.log(1-x));return x<(a+1)/(a+b+2)?bt*betacf(a,b,x)/a:1-bt*betacf(b,a,1-x)/b}
+const tIn=(t,df)=>1-ibeta(df/(df+t*t),df/2,0.5),tc={};
+function tcrit(df,l){const k=df+'_'+l;if(tc[k])return tc[k];let lo=0,hi=1000;for(let i=0;i<200;i++){const m=(lo+hi)/2;if(tIn(m,df)<l)lo=m;else hi=m}return tc[k]=(lo+hi)/2}
+const f2=v=>Number.isFinite(v)?v.toFixed(2):'—',f3=v=>v.toFixed(3);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+/* ---- population: 平均35・SD8 に合わせた整数の得点 ---- */
+function makePop(){
+  for(let tries=0;tries<2000;tries++){
+    let z=Array.from({length:N},randn);const m=z.reduce((s,v)=>s+v,0)/N,sd=Math.sqrt(z.reduce((q,v)=>q+(v-m)**2,0)/N);
+    const sc=Math.sqrt(SIG*SIG-1/12);let x=z.map(v=>Math.max(0,Math.round(MU+sc*(v-m)/sd)));
+    let diff=MU*N-x.reduce((s,v)=>s+v,0),g=0;while(diff!==0&&g++<1000){const i=Math.floor(Math.random()*N),st=Math.sign(diff);if(x[i]+st>=0){x[i]+=st;diff-=st}}
+    const mm=x.reduce((s,v)=>s+v,0)/N,ss=Math.sqrt(x.reduce((q,v)=>q+(v-mm)**2,0)/N);
+    if(Math.abs(ss-SIG)<0.005||tries===1999){popM=mm;popSD=ss;return x}
+  }
+}
+function newRound(){pop=makePop();
+  look=Array.from({length:N},()=>({s:pick(SKIN),h:pick(HAIR),c:pick(SHIRT),st:Math.floor(Math.random()*3),dx:(Math.random()-.5)*16,dy:(Math.random()-.5)*10}));
+  asked=[];last=null;revealed=false;resetCalc();render()}
+function resetCalc(){ans={};state={};hintOn={};fill=false}
+
+/* ---- correct values ---- */
+function truth(){
+  const v=asked.map(i=>pop[i]),n=v.length,o={n};if(!n)return o;
+  o.sum=v.reduce((s,x)=>s+x,0);o.mean=o.sum/n;o.sqrtn=Math.sqrt(n);
+  if(mode==='u'){if(n<2)return o;o.ss=v.reduce((q,x)=>q+(x-o.mean)**2,0);o.var=o.ss/(n-1);o.sd=Math.sqrt(o.var);o.se=o.sd/o.sqrtn;o.crit=tcrit(n-1,lv)}
+  else{o.se=SIG/o.sqrtn;o.crit=ZC[lv]}
+  o.moe=o.crit*o.se;o.lo=o.mean-o.moe;o.hi=o.mean+o.moe;return o;
+}
+function stepsDef(T){
+  const n=T.n,K=mode==='k',vals=asked.map(i=>pop[i]);
+  const S=[{id:'sum',name:'合計 Σx',fm:'聞いた得点をすべて足す',tol:0.001,hint:()=>`Σx = ${vals.join(' + ')}`}];
+  S.push({id:'mean',name:'平均 x̄',fm:'x̄ = Σx ÷ n',hint:()=>`x̄ = ${T.sum} ÷ ${n}`});
+  if(!K){
+    S.push({id:'ss',name:'偏差平方和 Σ(x − x̄)²',fm:'各得点から x̄ を引いて2乗し、すべて足す',hint:()=>`(${vals[0]} − ${f2(T.mean)})² + (${vals[1]} − ${f2(T.mean)})² + … を ${n}人分足します。右の計算表を使うと便利です。`});
+    S.push({id:'var',name:'不偏分散 s²',fm:'s² = Σ(x − x̄)² ÷ (n − 1)',hint:()=>`s² = ${f2(T.ss)} ÷ (${n} − 1) = ${f2(T.ss)} ÷ ${n-1}`});
+    S.push({id:'sd',name:'標準偏差 s',fm:'s = √s²',hint:()=>`s = √${f2(T.var)}`});
+    S.push({id:'se',name:'標準誤差 SE',fm:'SE = s ÷ √n',hint:()=>`SE = ${f2(T.sd)} ÷ √${n} = ${f2(T.sd)} ÷ ${f3(T.sqrtn)}`});
+    S.push({id:'crit',name:`t 値（自由度 ${n-1}、${lv*100}%）`,fm:'t分布表で、自由度 n − 1 の両側 '+lv*100+'% の値を読む',tol:0.006,hint:()=>`自由度 = ${n} − 1 = ${n-1}。右の「t分布表」で、df = ${n-1} の行と ${lv*100}% の列が交わるところを読みます。`});
+    S.push({id:'moe',name:'誤差の幅',fm:'誤差の幅 = t × SE',hint:()=>`${f3(T.crit)} × ${f2(T.se)}`});
+  }else{
+    S.push({id:'se',name:'標準誤差 SE',fm:'SE = σ ÷ √n（σ = 8）',hint:()=>`SE = 8 ÷ √${n} = 8 ÷ ${f3(T.sqrtn)}`});
+    S.push({id:'crit',name:`z 値（${lv*100}%）`,fm:'標準正規分布で、両側 '+lv*100+'% に対応する値',tol:0.006,hint:()=>`右の「z の値」の表で ${lv*100}% の値を読みます。`});
+    S.push({id:'moe',name:'誤差の幅',fm:'誤差の幅 = z × SE',hint:()=>`${T.crit.toFixed(lv===0.95?2:3)} × ${f2(T.se)}`});
+  }
+  S.push({id:'lo',name:'下限',fm:'下限 = x̄ − 誤差の幅',hint:()=>`${f2(T.mean)} − ${f2(T.moe)}`});
+  S.push({id:'hi',name:'上限',fm:'上限 = x̄ + 誤差の幅',hint:()=>`${f2(T.mean)} + ${f2(T.moe)}`});
+  return S;
+}
+function okVal(v,t,tol){return Number.isFinite(v)&&Math.abs(v-t)<=(tol??Math.max(0.015,Math.abs(t)*0.006))}
+
+/* ---- plaza ---- */
+function drawPlaza(){
+  const cw=100,rh=90,top=70;let g=`<defs><pattern id="tl" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0H0V50" fill="none" stroke="var(--tile)" stroke-width="2"/></pattern></defs><rect width="1000" height="1030" fill="url(#tl)"/><ellipse cx="500" cy="1015" rx="190" ry="34" fill="var(--tile)"/>`;
+  let bubble='';
+  for(let i=0;i<N;i++){
+    const r=Math.floor(i/10),c=i%10,L=look[i],x=c*cw+50+L.dx,y=top+r*rh+28+L.dy,a=asked.includes(i),show=a||revealed;
+    g+=`<g class="p" data-i="${i}" opacity="${revealed&&!a?.55:1}"><rect x="${x-46}" y="${y-44}" width="92" height="88" fill="transparent"/>`+
+      `<ellipse cx="${x}" cy="${y+33}" rx="20" ry="5" fill="#000" opacity=".12"/>`+
+      `<path class="body" d="M${x-18} ${y+32}v-16q0-14 18-14q18 0 18 14v16z" fill="${L.c}"/><circle cx="${x}" cy="${y-12}" r="13" fill="${L.s}"/>`+
+      (L.st===0?`<path d="M${x-13} ${y-12}a13 13 0 0 1 26 0q-6-6-13-6t-13 6z" fill="${L.h}"/>`:L.st===1?`<path d="M${x-14} ${y-8}a14 14 0 0 1 28 0v8h-4v-10q-10-6-20 0v10h-4z" fill="${L.h}"/>`:`<path d="M${x-13} ${y-14}a13 13 0 0 1 26 0z" fill="${L.h}"/><circle cx="${x}" cy="${y-28}" r="5" fill="${L.h}"/>`)+
+      `<circle cx="${x-4.5}" cy="${y-11}" r="1.6" fill="#222"/><circle cx="${x+4.5}" cy="${y-11}" r="1.6" fill="#222"/>`;
+    if(show)g+=`<rect x="${x-24}" y="${y+36}" width="48" height="20" rx="10" fill="${a?'var(--ink)':'var(--panel)'}" ${a?'':'stroke="var(--line)"'}/><text x="${x}" y="${y+50.5}" text-anchor="middle" font-size="13" font-weight="700" fill="${a?'var(--bg)':'var(--mute)'}">${pop[i]}</text>`;
+    g+='</g>';
+    if(i===last&&!revealed){const bx=Math.min(930,Math.max(70,x));
+      bubble=`<g pointer-events="none"><rect x="${bx-58}" y="${y-82}" width="116" height="44" rx="12" fill="var(--panel)" stroke="var(--ink)" stroke-width="2"/><path d="M${x-8} ${y-39}l8 10l8 -10z" fill="var(--panel)" stroke="var(--ink)" stroke-width="2"/><rect x="${x-9}" y="${y-41}" width="18" height="4" fill="var(--panel)"/><text x="${bx}" y="${y-53}" text-anchor="middle" font-size="22" font-weight="700" fill="var(--ink)">${pop[i]}<tspan font-size="13" font-weight="500"> 点</tspan></text></g>`}
+  }
+  g+=`<text x="500" y="1022" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">▲ あなた</text>`;
+  $('plaza').innerHTML=g+bubble;
+}
+
+/* ---- panel ---- */
+function myCI(){const T=truth();if(state.lo==='ok'&&state.hi==='ok')return{L:+ans.lo,U:+ans.hi,mean:T.mean};return null}
+function drawDot(){
+  const svg=$('dotSvg'),W=svg.clientWidth,H=svg.clientHeight;if(!W)return;
+  const lo=0,hi=70,m={l:14,r:14},X=v=>m.l+(Math.min(hi,Math.max(lo,v))-lo)/(hi-lo)*(W-m.l-m.r),base=H-30;
+  let g=`<line x1="${m.l}" x2="${W-m.r}" y1="${base}" y2="${base}" stroke="var(--mute)"/>`;
+  for(let v=0;v<=70;v+=W<420?20:10){const x=X(v);g+=`<line x1="${x}" x2="${x}" y1="${base}" y2="${base+5}" stroke="var(--mute)"/><text x="${x}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--mute)">${v}</text>`}
+  if(revealed)for(let i=0;i<N;i++)if(!asked.includes(i))g+=`<circle cx="${X(pop[i])}" cy="${base-8-(i%4)*5}" r="3" fill="var(--mute)" opacity=".35"/>`;
+  asked.forEach((i,j)=>g+=`<circle cx="${X(pop[i])}" cy="${base-8-(j%4)*5}" r="4" fill="var(--ink)"/>`);
+  const C=myCI()||(revealed?(()=>{const T=truth();return T.lo!=null?{L:T.lo,U:T.hi,mean:T.mean,auto:1}:null})():null);
+  if(C){const y=38;g+=`<line x1="${X(C.L)}" x2="${X(C.U)}" y1="${y}" y2="${y}" stroke="var(--ci)" stroke-width="5" stroke-linecap="round" ${C.auto?'stroke-dasharray="6 4"':''}/><circle cx="${X(C.mean)}" cy="${y}" r="6" fill="var(--panel)" stroke="var(--ci)" stroke-width="3"/>`}
+  if(revealed){const x=X(popM);g+=`<line x1="${x}" x2="${x}" y1="8" y2="${base}" stroke="var(--acc)" stroke-width="2.5"/><text x="${Math.min(W-50,Math.max(50,x))}" y="14" text-anchor="middle" font-size="12" font-weight="700" fill="var(--acc)">μ = ${popM.toFixed(0)}</text>`}
+  if(!asked.length)g+=`<text x="${W/2}" y="${base/2+6}" text-anchor="middle" font-size="13" fill="var(--mute)">聞いた得点がここに並びます</text>`;
+  svg.innerHTML=g;
+}
+function renderPanel(){
+  const K=mode==='k',T=truth();
+  $('rlabel').textContent=`抑うつ得点・${lv*100}%信頼区間・${K?'σ既知（z）':'σ未知（t）'}`;
+  $('pinfo').textContent=`話しかけた人数 ${asked.length} / 100`;
+  $('sigInfo').innerHTML=revealed?`<div class="info" style="background:var(--accs)">母平均 μ = <b>${popM.toFixed(2)}</b>、母標準偏差 σ = <b>${popSD.toFixed(2)}</b></div>`:
+    K?`<div class="info" style="background:var(--cis)">母集団の標準偏差 σ = <b>8</b> が分かっています。母平均は分かりません。</div>`:`<div class="info" style="background:var(--bg);color:var(--mute)">母平均も母標準偏差も分かりません。聞いた得点から s を計算して使います。</div>`;
+  $('vals').innerHTML=asked.length?asked.map(i=>`<span>${pop[i]}</span>`).join(''):'<span style="background:transparent;color:var(--mute);font-weight:400;padding:0">まだ誰にも聞いていません</span>';
+  const C=myCI();
+  if(C){$('mycl').className='mycl';$('mycl').textContent=`[${f2(C.L)}, ${f2(C.U)}]`}
+  else{$('mycl').className='mycl wait';$('mycl').textContent='下の計算ステップで下限と上限まで正解すると、ここに表示されます'}
+  $('r1').disabled=$('r5').disabled=revealed;$('go').disabled=revealed||!asked.length;
+  const res=$('result');
+  if(revealed){
+    let h=`<div class="v">母平均 μ = ${popM.toFixed(2)}、母標準偏差 σ = ${popSD.toFixed(2)}</div>`;
+    if(C){const hit=C.L<=popM&&popM<=C.U;h+=`<p>あなたの区間 [${f2(C.L)}, ${f2(C.U)}] は、母平均を<b style="color:${hit?'var(--ok)':'var(--acc)'}">${hit?'含んでいました':'含んでいませんでした'}</b>。</p>`}
+    else if(T.lo!=null){const hit=T.lo<=popM&&popM<=T.hi;h+=`<p>計算は途中でした。この${T.n}人から作られる正しい区間は [${f2(T.lo)}, ${f2(T.hi)}] で（数直線の破線）、母平均を${hit?'含んでいました':'含んでいませんでした'}。</p>`}
+    h+=`<p class="note">${lv*100}%信頼区間は、この手続きを何度も繰り返したとき、そのうち約${lv*100}%が母平均を含むように作られています。今回の1本が外れていても、計算が間違っているとは限りません。</p><div class="btns"><button class="pri" type="button" id="next">新しい広場で練習する</button></div>`;
+    res.innerHTML=h;res.classList.add('show');$('next').addEventListener('click',newRound)}
+  else{res.classList.remove('show');res.innerHTML=''}
+  drawDot();
+}
+
+/* ---- calc steps ---- */
+function renderSteps(){
+  const T=truth(),K=mode==='k';
+  if(!T.n||(!K&&T.n<2)){$('steps').innerHTML=`<div class="empty">${K?'1人以上':'2人以上'}に話しかけると、計算を始められます。</div>`;$('prog').textContent='';return}
+  const S=stepsDef(T),done=S.filter(s=>state[s.id]==='ok').length;
+  $('prog').textContent=`n = ${T.n} 人のデータで計算中　正解 ${done} / ${S.length}`;
+  $('steps').innerHTML=S.map((s,k)=>{const st=state[s.id];
+    return `<div class="step ${st||''}" data-s="${s.id}"><div class="shd"><b>${k+1}. ${s.name}</b><span class="fm">${s.fm}</span></div>
+      <div class="srow"><input type="number" step="any" inputmode="decimal" data-in="${s.id}" value="${ans[s.id]??''}" aria-label="${s.name}">
+      <button class="sm" type="button" data-chk="${s.id}">確認</button><button class="sm" type="button" data-hint="${s.id}">ヒント</button><button class="sm" type="button" data-show="${s.id}" style="color:var(--mute)">答えを見る</button></div>
+      ${st==='ok'?`<div class="fb ok">正解です${state[s.id+'_shown']?'（答えを表示しました）':''}</div>`:st==='ng'?`<div class="fb ng">${ngMsg(s.id,T)}</div>`:''}
+      ${hintOn[s.id]?`<div class="hint">${s.hint()}</div>`:''}</div>`}).join('');
+}
+function ngMsg(id,T){
+  const v=parseFloat(ans[id]);
+  if(id==='var'&&Number.isFinite(v)&&okVal(v,T.ss/T.n))return 'n で割っていませんか？不偏分散は n − 1 で割ります。';
+  if(id==='crit'&&mode==='u'&&Number.isFinite(v)&&okVal(v,ZC[lv],0.006))return 'それは z の値です。σ が分からないときは t 分布の値を使います。';
+  if(id==='se'&&mode==='u'&&Number.isFinite(v)&&okVal(v,T.sd/T.n))return 's を n で割っていませんか？標準誤差は s を √n で割ります。';
+  if(id==='se'&&mode==='k'&&Number.isFinite(v)&&okVal(v,SIG/T.n))return 'σ を n で割っていませんか？標準誤差は σ を √n で割ります。';
+  return 'もう一度確かめてみましょう。「ヒント」も使えます。';
+}
+function stepVal(id){const T=truth();return T[id]}
+function checkStep(id,show){
+  const T=truth(),s=stepsDef(T).find(x=>x.id===id);if(!s)return;
+  if(show){ans[id]=(id==='sum'?T.sum:id==='crit'?+T.crit.toFixed(3):+T[id].toFixed(2));state[id+'_shown']=1}
+  state[id]=okVal(parseFloat(ans[id]),T[id],s.tol)?'ok':'ng';
+  renderSteps();renderPanel();renderTable();
+}
+
+/* ---- assist tables ---- */
+function renderTable(){
+  const T=truth(),vals=asked.map(i=>pop[i]),can=state.mean==='ok',useM=can?T.mean:null;
+  $('fillDev').disabled=!can||!vals.length||mode==='k';
+  if(mode==='k')$('dTbl').querySelector('summary').textContent='計算表（x の一覧と合計）';else $('dTbl').querySelector('summary').textContent='計算表（x、偏差、偏差の2乗）';
+  if(!vals.length){$('calcTbl').innerHTML='<div class="empty">話しかけた人の得点がここに並びます。</div>';return}
+  const showD=fill&&can&&mode==='u';
+  $('calcTbl').innerHTML=`<table><thead><tr><th>人</th><th>x</th>${mode==='u'?'<th>x − x̄</th><th>(x − x̄)²</th>':''}</tr></thead><tbody>`+
+    vals.map((v,k)=>`<tr><td>${k+1}</td><td>${v}</td>${mode==='u'?`<td>${showD?f2(v-useM):''}</td><td>${showD?f2((v-useM)**2):''}</td>`:''}</tr>`).join('')+
+    `</tbody><tfoot><tr><td>合計</td><td>${state.sum==='ok'?T.sum:'?'}</td>${mode==='u'?`<td>${showD?'0.00':''}</td><td>${showD?(state.ss==='ok'?f2(T.ss):'?'):''}</td>`:''}</tr></tfoot></table>`+
+    `<div class="note" style="padding:6px 10px">${mode==='u'?(can?`x̄ = ${f2(T.mean)} を使っています。`:'x̄ を正解すると、偏差と2乗を自動で入れられます。'):''}合計欄は、そのステップが正解すると表示されます。</div>`;
+}
+function renderDist(){
+  const T=truth(),df=T.n>=2?T.n-1:null,L=[0.9,0.95,0.99];
+  if(mode==='k'){$('distSum').textContent='z の値（標準正規分布・両側）';
+    $('distTbl').innerHTML=`<table><thead><tr><th>信頼水準</th><th>z</th></tr></thead><tbody>${L.map(l=>`<tr class="${l===lv?'hl':''}"><td style="text-align:left">${l*100}%</td><td>${ZC[l].toFixed(l===0.95?2:3)}</td></tr>`).join('')}</tbody></table>`;return}
+  $('distSum').textContent='t分布表（両側）';
+  const rows=[...Array.from({length:30},(_,i)=>i+1),40,60,120];
+  let h=`<table><thead><tr><th style="text-align:left">自由度 df</th>${L.map(l=>`<th class="${l===lv?'hl':''}">${l*100}%</th>`).join('')}</tr></thead><tbody>`;
+  if(df&&!rows.includes(df))h+=`<tr class="hl"><td style="text-align:left">${df}（あなたの df）</td>${L.map(l=>`<td>${f3(tcrit(df,l))}</td>`).join('')}</tr>`;
+  h+=rows.map(d=>`<tr class="${d===df?'hl':''}"><td style="text-align:left">${d}</td>${L.map(l=>`<td class="${l===lv&&d!==df?'':''}">${f3(tcrit(d,l))}</td>`).join('')}</tr>`).join('');
+  h+=`<tr><td style="text-align:left">∞（= z）</td>${L.map(l=>`<td>${ZC[l].toFixed(3)}</td>`).join('')}</tr></tbody></table>`;
+  $('distTbl').innerHTML=h;
+}
+function renderSqrt(){let h='<table><thead><tr><th style="text-align:left">n</th><th>√n</th><th style="text-align:left">n</th><th>√n</th></tr></thead><tbody>';
+  for(let i=1;i<=25;i++){const a=i+1,b=i+26;h+=`<tr class="${a===asked.length||b===asked.length?'':''}"><td style="text-align:left${a===asked.length?';background:var(--accs);font-weight:700':''}">${a}</td><td${a===asked.length?' class="hl"':''}>${f3(Math.sqrt(a))}</td><td style="text-align:left${b===asked.length?';background:var(--accs);font-weight:700':''}">${b}</td><td${b===asked.length?' class="hl"':''}>${f3(Math.sqrt(b))}</td></tr>`}
+  $('sqrtTbl').innerHTML=h+'</tbody></table>'}
+
+function render(){drawPlaza();renderPanel();renderSteps();renderTable();renderDist();renderSqrt()}
+function changed(){resetCalc();render()}
+
+/* ---- wiring ---- */
+function ask(i){if(revealed||asked.includes(i))return;asked.push(i);last=i;changed()}
+function askRandom(k){if(revealed)return;const rest=[];for(let i=0;i<N;i++)if(!asked.includes(i))rest.push(i);
+  for(let j=0;j<k&&rest.length;j++){const r=Math.floor(Math.random()*rest.length);asked.push(rest[r]);last=rest[r];rest.splice(r,1)}changed()}
+$('lvChips').innerHTML=[0.9,0.95,0.99].map(v=>`<button type="button" data-v="${v}">${v*100}%</button>`).join('');
+function mark(){$('lvChips').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===lv));$('modeChips').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===mode))}
+$('lvChips').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!revealed){lv=+b.dataset.v;mark();for(const k of ['crit','moe','lo','hi'])delete state[k];render()}});
+$('modeChips').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!revealed){mode=b.dataset.v;mark();changed()}});
+$('newBtn').addEventListener('click',newRound);
+$('plaza').addEventListener('click',e=>{const g=e.target.closest('g.p');if(g)ask(+g.dataset.i)});
+$('r1').addEventListener('click',()=>askRandom(1));$('r5').addEventListener('click',()=>askRandom(5));
+$('go').addEventListener('click',()=>{revealed=true;render()});
+$('fillDev').addEventListener('click',()=>{fill=true;renderTable()});
+$('steps').addEventListener('input',e=>{const id=e.target.dataset.in;if(id)ans[id]=e.target.value});
+$('steps').addEventListener('keydown',e=>{const id=e.target.dataset.in;if(id&&e.key==='Enter'){ans[id]=e.target.value;checkStep(id)}});
+$('steps').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.chk){const inp=$('steps').querySelector(`[data-in="${b.dataset.chk}"]`);ans[b.dataset.chk]=inp.value;checkStep(b.dataset.chk)}
+  else if(b.dataset.hint){hintOn[b.dataset.hint]=!hintOn[b.dataset.hint];renderSteps()}
+  else if(b.dataset.show)checkStep(b.dataset.show,true)});
+const ro=new ResizeObserver(drawDot);ro.observe($('dotSvg'));
+mark();newRound();
+}
+</script>
+</body>
+</html>
